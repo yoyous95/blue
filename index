@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Bluetooth API 예제</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 25px;
+            font-size: 18px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>블루투스 기기 연결하기</h1>
+    <button id="connectBtn">블루투스 검색 및 연결</button>
+    <div id="status">연결 상태: 대기 중...</div>
+
+    <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDiv = document.getElementById('status');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.textContent = '기기 검색 중... 브라우저 팝업을 확인하세요.';
+                statusDiv.style.color = 'black';
+
+                // 1. 블루투스 기기 검색 (주변의 모든 BLE 기기 허용)
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    /* 특정 기능을 가진 기기만 찾으려면 filters를 사용합니다.
+                    filters: [{ services: ['battery_service'] }],
+                    optionalServices: ['battery_service'] // 연결 후 사용할 서비스 명시
+                    */
+                });
+
+                statusDiv.textContent = `${device.name || '이름 없는 기기'}에 연결 시도 중...`;
+
+                // 2. 기기의 GATT 서버에 연결 (데이터 통신을 위한 관문)
+                const server = await device.gatt.connect();
+
+                statusDiv.textContent = `연결 성공! 기기 이름: ${device.name || '알 수 없음'}`;
+                statusDiv.style.color = 'green';
+
+                // 3. 기기 연결이 끊어졌을 때의 이벤트 처리
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+            } catch (error) {
+                console.error('블루투스 연결 에러:', error);
+                // 사용자가 팝업에서 취소를 누르거나 연결에 실패한 경우
+                statusDiv.textContent = `연결 실패 또는 취소됨: ${error.message}`;
+                statusDiv.style.color = 'red';
+            }
+        });
+
+        // 연결 해제 시 실행되는 함수
+        function onDisconnected(event) {
+            const device = event.target;
+            statusDiv.textContent = `기기(${device.name || '알 수 없음'})와의 연결이 끊어졌습니다.`;
+            statusDiv.style.color = '#d97706'; // 주황색
+        }
+    </script>
+</body>
+</html>
