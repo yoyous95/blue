@@ -3,86 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Bluetooth API 예제</title>
+    <title>블루투스 기기 연결기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 50px;
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f3f4f6;
         }
-        button {
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: background-color 0.3s;
+        
+        /* 펄스 애니메이션 (검색 중일 때 사용) */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #status {
-            margin-top: 25px;
-            font-size: 18px;
-            font-weight: 500;
+        .searching-animation {
+            animation: pulse-ring 2s infinite;
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex items-center justify-center p-4">
 
-    <h1>블루투스 기기 연결하기</h1>
-    <button id="connectBtn">블루투스 검색 및 연결</button>
-    <div id="status">연결 상태: 대기 중...</div>
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center transition-all duration-300">
+        
+        <!-- 아이콘 영역 -->
+        <div class="mb-6 flex justify-center">
+            <div id="iconContainer" class="p-4 bg-blue-100 rounded-full text-blue-600 transition-all duration-300">
+                <i data-lucide="bluetooth" class="w-10 h-10"></i>
+            </div>
+        </div>
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">블루투스 기기 스캐너</h1>
+        <p class="text-gray-500 mb-8 text-sm">주변의 BLE(Bluetooth Low Energy) 기기를 검색하고 연결합니다.</p>
+
+        <!-- 메인 버튼 -->
+        <button id="connectBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 px-6 rounded-xl transition duration-200 shadow-md flex items-center justify-center gap-2">
+            <i data-lucide="search" class="w-5 h-5"></i>
+            <span>기기 검색 및 연결</span>
+        </button>
+        
+        <button id="disconnectBtn" class="hidden w-full mt-3 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-3 px-6 rounded-xl transition duration-200 border border-red-200 flex items-center justify-center gap-2">
+            <i data-lucide="bluetooth-off" class="w-5 h-5"></i>
+            <span>연결 해제</span>
+        </button>
+
+        <!-- 상태 표시 영역 -->
+        <div class="mt-6 p-4 rounded-xl bg-gray-50 border border-gray-100 text-left">
+            <p id="statusText" class="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                대기 중... 버튼을 눌러주세요.
+            </p>
+        </div>
+
+        <!-- 기기 상세 정보 영역 (연결 성공 시 표시) -->
+        <div id="deviceInfo" class="hidden mt-4 text-left p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl text-sm shadow-inner">
+            <h3 class="font-bold text-blue-900 mb-3 border-b border-blue-200 pb-2">연결된 기기 정보</h3>
+            <div class="space-y-2 text-blue-800">
+                <p class="flex justify-between">
+                    <span class="font-medium text-blue-600">이름:</span> 
+                    <span id="deviceName" class="font-semibold">-</span>
+                </p>
+                <p class="flex justify-between">
+                    <span class="font-medium text-blue-600">ID:</span> 
+                    <span id="deviceId" class="font-mono text-xs mt-1">-</span>
+                </p>
+                <p class="flex justify-between">
+                    <span class="font-medium text-blue-600">GATT 연결:</span> 
+                    <span id="gattStatus" class="font-semibold text-green-600">O</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- 경고 메시지 영역 (API 미지원 등) -->
+        <div id="warningMsg" class="hidden mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded-lg text-left">
+            <i data-lucide="alert-triangle" class="w-4 h-4 inline-block mb-1"></i>
+            현재 환경(미리보기 iFrame 등)에서는 보안 정책상 블루투스 팝업이 차단될 수 있습니다. 
+            정상 작동하지 않는다면 우측 상단의 <b>'새 탭에서 열기'</b> 아이콘을 클릭하여 테스트해 보세요.
+        </div>
+    </div>
 
     <script>
+        // Lucide 아이콘 초기화
+        lucide.createIcons();
+
+        // DOM 요소
         const connectBtn = document.getElementById('connectBtn');
-        const statusDiv = document.getElementById('status');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusText = document.getElementById('statusText');
+        const deviceInfo = document.getElementById('deviceInfo');
+        const deviceName = document.getElementById('deviceName');
+        const deviceId = document.getElementById('deviceId');
+        const iconContainer = document.getElementById('iconContainer');
+        const warningMsg = document.getElementById('warningMsg');
+        const btnText = connectBtn.querySelector('span');
 
+        let connectedDevice = null;
+
+        // UI 상태 업데이트 함수
+        function updateUI(state, message = '') {
+            if (message) {
+                statusText.innerHTML = `<i data-lucide="info" class="w-4 h-4 inline"></i> ${message}`;
+                lucide.createIcons(); // 아이콘 다시 렌더링
+            }
+
+            switch(state) {
+                case 'idle':
+                    iconContainer.className = 'p-4 bg-blue-100 rounded-full text-blue-600 transition-all duration-300';
+                    btnText.textContent = '기기 검색 및 연결';
+                    connectBtn.disabled = false;
+                    connectBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    connectBtn.classList.remove('hidden');
+                    disconnectBtn.classList.add('hidden');
+                    deviceInfo.classList.add('hidden');
+                    statusText.className = 'text-sm font-medium text-gray-600 flex items-center gap-2';
+                    break;
+                case 'searching':
+                    iconContainer.className = 'p-4 bg-blue-100 rounded-full text-blue-600 transition-all duration-300 searching-animation';
+                    btnText.textContent = '검색 중...';
+                    connectBtn.disabled = true;
+                    connectBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    statusText.className = 'text-sm font-medium text-blue-600 flex items-center gap-2';
+                    warningMsg.classList.remove('hidden'); // iFrame 경고 표시
+                    break;
+                case 'connected':
+                    iconContainer.className = 'p-4 bg-green-100 rounded-full text-green-600 transition-all duration-300';
+                    iconContainer.innerHTML = '<i data-lucide="bluetooth-connected" class="w-10 h-10"></i>';
+                    connectBtn.classList.add('hidden');
+                    disconnectBtn.classList.remove('hidden');
+                    deviceInfo.classList.remove('hidden');
+                    statusText.className = 'text-sm font-medium text-green-600 flex items-center gap-2';
+                    warningMsg.classList.add('hidden');
+                    lucide.createIcons();
+                    break;
+                case 'error':
+                    iconContainer.className = 'p-4 bg-red-100 rounded-full text-red-600 transition-all duration-300';
+                    btnText.textContent = '다시 시도';
+                    connectBtn.disabled = false;
+                    connectBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    statusText.className = 'text-sm font-medium text-red-600 flex items-center gap-2';
+                    break;
+            }
+        }
+
+        // 초기 브라우저 지원 여부 확인
+        if (!navigator.bluetooth) {
+            updateUI('error', '이 브라우저는 Web Bluetooth API를 지원하지 않습니다.');
+            connectBtn.disabled = true;
+            connectBtn.classList.add('hidden');
+        }
+
+        // 연결 버튼 클릭 이벤트
         connectBtn.addEventListener('click', async () => {
-            try {
-                statusDiv.textContent = '기기 검색 중... 브라우저 팝업을 확인하세요.';
-                statusDiv.style.color = 'black';
+            updateUI('searching', '브라우저 상단의 팝업창에서 기기를 선택해주세요.');
 
-                // 1. 블루투스 기기 검색 (주변의 모든 BLE 기기 허용)
+            try {
+                // 기기 검색 (모든 기기 허용)
                 const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    /* 특정 기능을 가진 기기만 찾으려면 filters를 사용합니다.
-                    filters: [{ services: ['battery_service'] }],
-                    optionalServices: ['battery_service'] // 연결 후 사용할 서비스 명시
-                    */
+                    acceptAllDevices: true
+                    // 특정 서비스만 찾는 경우 아래 필터 사용
+                    // filters: [{ services: ['battery_service'] }]
                 });
 
-                statusDiv.textContent = `${device.name || '이름 없는 기기'}에 연결 시도 중...`;
+                updateUI('searching', `${device.name || '알 수 없는 기기'}에 연결을 시도합니다...`);
 
-                // 2. 기기의 GATT 서버에 연결 (데이터 통신을 위한 관문)
+                // GATT 서버 연결
                 const server = await device.gatt.connect();
+                
+                connectedDevice = device;
+                
+                // 정보 표시
+                deviceName.textContent = device.name || '알 수 없는 기기 (이름 없음)';
+                deviceId.textContent = device.id;
+                
+                updateUI('connected', '성공적으로 연결되었습니다!');
 
-                statusDiv.textContent = `연결 성공! 기기 이름: ${device.name || '알 수 없음'}`;
-                statusDiv.style.color = 'green';
-
-                // 3. 기기 연결이 끊어졌을 때의 이벤트 처리
+                // 연결 해제 이벤트 리스너 등록
                 device.addEventListener('gattserverdisconnected', onDisconnected);
 
             } catch (error) {
-                console.error('블루투스 연결 에러:', error);
-                // 사용자가 팝업에서 취소를 누르거나 연결에 실패한 경우
-                statusDiv.textContent = `연결 실패 또는 취소됨: ${error.message}`;
-                statusDiv.style.color = 'red';
+                console.error('블루투스 에러:', error);
+                
+                if (error.name === 'NotFoundError') {
+                    updateUI('error', '기기 선택이 취소되었거나 주변에 기기가 없습니다.');
+                } else if (error.name === 'SecurityError') {
+                    // 미리보기(iFrame) 권한 차단 에러 처리
+                    if (error.message.includes('permissions policy') || error.message.includes('disallowed')) {
+                        updateUI('error', '미리보기 환경에서는 블루투스가 차단됩니다. 우측 상단 <b>새 창/탭에서 열기</b>를 클릭하세요.');
+                        warningMsg.classList.remove('hidden');
+                    } else {
+                        updateUI('error', '보안 에러: HTTPS 환경에서 실행해주세요.');
+                    }
+                } else {
+                    updateUI('error', `연결 실패: ${error.message}`);
+                }
             }
         });
 
-        // 연결 해제 시 실행되는 함수
+        // 연결 해제 버튼 클릭 이벤트
+        disconnectBtn.addEventListener('click', () => {
+            if (connectedDevice && connectedDevice.gatt.connected) {
+                connectedDevice.gatt.disconnect();
+            }
+        });
+
+        // 기기 연결 해제 시 처리 함수
         function onDisconnected(event) {
             const device = event.target;
-            statusDiv.textContent = `기기(${device.name || '알 수 없음'})와의 연결이 끊어졌습니다.`;
-            statusDiv.style.color = '#d97706'; // 주황색
+            console.log(`기기 ${device.name} 연결 해제됨`);
+            connectedDevice = null;
+            
+            iconContainer.innerHTML = '<i data-lucide="bluetooth" class="w-10 h-10"></i>';
+            updateUI('idle', '기기와의 연결이 끊어졌습니다.');
         }
+
     </script>
 </body>
 </html>
