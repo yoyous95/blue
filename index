@@ -7,9 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
         body {
-            font-family: 'Pretendard', sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
             background-color: #f3f4f6;
         }
         
@@ -78,13 +78,14 @@
 
         <!-- 경고 메시지 영역 (API 미지원 등) -->
         <div id="warningMsg" class="hidden mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded-lg text-left">
-            <i data-lucide="alert-triangle" class="w-4 h-4 inline-block mb-1"></i>
-            현재 환경(미리보기 iFrame 등)에서는 보안 정책상 블루투스 팝업이 차단될 수 있습니다. 
-            정상 작동하지 않는다면 우측 상단의 <b>'새 탭에서 열기'</b> 아이콘을 클릭하여 테스트해 보세요.
-        </div>
+        <i data-lucide="alert-triangle" class="w-4 h-4 inline-block mb-1"></i>
+        현재 환경(미리보기 iFrame 등)에서는 보안 정책상 블루투스 팝업이 차단될 수 있습니다. 
+        정상 작동하지 않는다면 우측 상단의 <b>'새 탭에서 열기'</b> 아이콘을 클릭하여 테스트해 보세요.
     </div>
+</div>
 
-    <script>
+<script>
+    window.onload = function() {
         // Lucide 아이콘 초기화
         lucide.createIcons();
 
@@ -217,7 +218,7 @@
             iconContainer.innerHTML = '<i data-lucide="bluetooth" class="w-10 h-10"></i>';
             updateUI('idle', '기기와의 연결이 끊어졌습니다.');
         }
-
-    </script>
+    };
+</script>
 </body>
 </html>
